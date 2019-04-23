@@ -3,6 +3,7 @@ const Alexa = require('alexa-sdk');
 const AWS = require('aws-sdk'); 
 var dynamodb = new AWS.DynamoDB({apiVersion: '2012-08-10'});
 
+
 //Replace with your app ID (OPTIONAL).  You can find this value at the top of your skill's page on http://developer.amazon.com.
 //Make sure to enclose your value in quotes, like this: const APP_ID = 'amzn1.ask.skill.bb4045e6-b3e8-4133-b650-72923c5980f1';
 const APP_ID = "amzn1.ask.skill.677df7a4-c02e-42ec-96bc-ea49fa1c4b75";
@@ -17,7 +18,7 @@ const HELP_REPROMPT = 'What can I help you with?';
 const STOP_MESSAGE = 'Goodbye!';
 const FALLBACK_MESSAGE = 'I dont recognize that';
 
-var money = ""; 
+var money = 0; 
 
 const handlers = {
     'LaunchRequest': function () {
@@ -29,10 +30,10 @@ const handlers = {
         var newName = this.event.request.intent.slots.name.value; 
         var params = {
             Item: {
-                "name": { S: newName },
-                "money": {N: "0"}
+                "Name": { S: newName },
+                "Amount": {N: "0"}
             }, 
-            TableName: "piggybank"
+            TableName: "Piggybank"
         };
         dynamodb.putItem(params, function(err,data){
             if(err) console.log(err, err.stack); 
@@ -46,16 +47,15 @@ const handlers = {
     'AddMoney': function () {
         var newMoney = this.event.request.intent.slots.money.value; 
         var name = this.event.request.intent.slots.name.value; 
-        var item = "money"; 
         var speechOutput; 
-        getData(name,item)
+        getData(name)
         .then( (money) =>{
             var newAmount = (+money) + (+newMoney); 
             var params = {
-                TableName: "piggybank", 
+                TableName: "Piggybank", 
                 Item: {
-                    "name": {S: name},
-                    "money": {N: newAmount}
+                    "Name": {S: name},
+                    "Amount": {N: newAmount.toString()}
                 }
             }; 
             dynamodb.putItem(params, function(err,data){
@@ -76,19 +76,20 @@ const handlers = {
     },
     'GetMoney': function () {
         var name = this.event.request.intent.slots.name.value; 
-        var speechOutput; 
         getData(name)
         .then( (money) => {
-            speechOutput = "There is " + money + " dollars in " + name + "'s account!"; 
+            var speechOutput = "There is " + money + " dollars in " + name + "'s account!"; 
             this.response.speak(speechOutput).listen(""); 
             this.emit(':responseReady'); 
         })
         .catch( (error) => {
             console.log(error); 
-            speechOutput = "There was an error with that"; 
+            var speechOutput = "There was an error with that"; 
             this.response.speak(speechOutput).listen(""); 
             this.emit(':responseReady'); 
     }); 
+        this.response.speak("There is " + money + " dollars in " + name + "'s account").listen(""); 
+        this.emit(':responseReady'); 
     },
     'AMAZON.HelpIntent': function () {
         const speechOutput = HELP_MESSAGE;
@@ -122,26 +123,29 @@ exports.handler = function (event, context, callback) {
     alexa.execute();
 };
 
-function getData (name,item) {
+function getData (name) {
         var params = {
-                TableName: "piggybank", 
+                TableName: "Piggybank", 
                     Key:
                         {
-                            "name" : {
+                            "Name" : {
                                 S: name
                             }
                         },
-                    ProjectionExpression : item
+                    ProjectionExpression : 'Amount'
         }; 
         
-        return new Promise((resolve,reject) => {
+        return new Promise( (resolve,reject) => {
             dynamodb.getItem(params, function(err, data) {
             if (err) {
             }else{
-                money = data.Item.money.N;
-                resolve(money);     
+                money = data.Item.Amount.N;
+                resolve(money); 
+                console.log(money); 
             }
         });
     });
 }
+
+
 
